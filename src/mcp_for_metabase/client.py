@@ -10,6 +10,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from mcp_for_metabase.audit import AuditLogger
 from mcp_for_metabase.config import Settings
 from mcp_for_metabase.errors import MetabaseError
+from mcp_for_metabase.redaction import redact_headers, redact_value
 from mcp_for_metabase.safety import READ_METHODS, SafetyPolicy
 from mcp_for_metabase.sql_guard import enforce_sql_guard
 
@@ -50,19 +51,21 @@ class MetabaseClient:
             return
         if not self.settings.metabase_username or not self.settings.metabase_password:
             return
+        request_id = str(uuid4())
         response = await self._client.post(
             "/api/session",
             json={
                 "username": self.settings.metabase_username,
                 "password": self.settings.metabase_password.get_secret_value(),
             },
+            headers=self._headers(request_id),
         )
         self._raise_for_response(response)
         body = response.json()
         self._session_id = body.get("id")
 
     def _headers(self, request_id: str) -> dict[str, str]:
-        headers = {"X-Metabase-MCP-Request-ID": request_id}
+        headers = {**self.settings.outbound_headers, "X-Metabase-MCP-Request-ID": request_id}
         if self.settings.metabase_api_key and self.settings.metabase_api_key.get_secret_value():
             headers["X-API-Key"] = self.settings.metabase_api_key.get_secret_value()
         elif self._session_id:
@@ -115,13 +118,19 @@ class MetabaseClient:
 
         request_id = str(uuid4())
         await self.authenticate()
-        logger.debug("metabase_request", request_id=request_id, **planned)
+        headers = self._headers(request_id)
+        logger.debug(
+            "metabase_request",
+            request_id=request_id,
+            headers=redact_headers(headers),
+            **redact_value(planned),
+        )
         response = await self._client.request(
             method,
             resolved_path,
             params=query,
             json=body,
-            headers=self._headers(request_id),
+            headers=headers,
         )
         result = self._response_payload(response)
         self._raise_for_response(response, result)
@@ -185,8 +194,15 @@ class MetabaseClient:
     def _raise_for_response(response: httpx.Response, body: Any | None = None) -> None:
         if response.status_code < 400:
             return
+        message = "Metabase API request failed"
+        if response.status_code == 401:
+            challenge = response.headers.get("WWW-Authenticate", "")
+            if "basic" in challenge.lower():
+                message = "Metabase API request failed: upstream proxy authentication returned 401"
+            else:
+                message = "Metabase API request failed: Metabase authentication returned 401"
         raise MetabaseError(
-            "Metabase API request failed",
+            message,
             status_code=response.status_code,
             response_body=body,
             request_id=response.headers.get("X-Request-ID"),

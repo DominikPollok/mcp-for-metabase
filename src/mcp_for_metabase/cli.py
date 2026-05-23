@@ -4,6 +4,7 @@ from typing import Annotated
 import typer
 
 from mcp_for_metabase.config import Settings, Transport
+from mcp_for_metabase.runtime_logging import configure_logging
 from mcp_for_metabase.server import create_mcp
 
 app = typer.Typer(help="Metabase MCP server")
@@ -25,6 +26,7 @@ def serve(
 ) -> None:
     settings = Settings()
     selected_transport = transport or settings.metabase_mcp_transport
+    configure_logging(selected_transport.value)
     if host is not None:
         settings.metabase_mcp_http_host = host
     if port is not None:

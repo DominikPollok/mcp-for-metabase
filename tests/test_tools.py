@@ -11,6 +11,7 @@ from mcp_for_metabase.tools import (
     archive_collection,
     archive_dashboard,
     clear_cache,
+    collection_tree,
     copy_card,
     copy_dashboard,
     copy_document,
@@ -455,6 +456,7 @@ async def test_remaining_curated_helpers_build_expected_requests() -> None:
     client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
     try:
         read_results = [
+            await collection_tree(client),
             await list_databases(client),
             await get_card(client, card_id=1),
             await get_dashboard(client, dashboard_id=2),

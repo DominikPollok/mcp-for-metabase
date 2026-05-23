@@ -23,12 +23,32 @@ Current highlights:
 Detailed capability tables live in [docs/CAPABILITIES.md](docs/CAPABILITIES.md), with generated API coverage in [docs/API_COVERAGE.md](docs/API_COVERAGE.md).
 Live test instructions are in [docs/INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md).
 
-## Installation
+## 5-Minute Setup
+
+You need:
+
+- Python 3.12+ for local stdio setup, or Docker for HTTP setup.
+- A Metabase URL, for example `https://metabase.example.com`.
+- A Metabase API key. In Metabase, create one under **Admin settings -> Authentication -> API keys** and assign it to a least-privileged group. The key is sent to Metabase as `X-API-Key`.
+
+Start in `read-only` mode. After the first successful connection, switch to `safe-writes` only if the agent should create or update Metabase content.
+
+### Option A: Local stdio
+
+Use this when Codex or Claude Code should launch the MCP server as a local process.
+
+Install the command:
 
 From PyPI, after the first public release:
 
 ```bash
-python -m pip install mcp-for-metabase
+pipx install mcp-for-metabase
+```
+
+Before the first PyPI release, install from GitHub:
+
+```bash
+pipx install git+https://github.com/DominikPollok/mcp-for-metabase.git
 ```
 
 From source:
@@ -41,7 +61,70 @@ python -m pip install -e ".[dev]"
 
 The package name and primary console command are both `mcp-for-metabase`. The legacy `metabase-mcp` console command is also installed as a compatibility alias. There are similarly named Metabase MCP packages on PyPI, so check the repository URL and license metadata before installing.
 
-## Quickstart With Docker
+Connect Codex:
+
+```bash
+codex mcp add metabase \
+  --env METABASE_URL=https://metabase.example.com \
+  --env METABASE_API_KEY=mb_your_key \
+  --env METABASE_MCP_WRITE_MODE=read-only \
+  -- mcp-for-metabase serve --transport stdio
+codex mcp list
+```
+
+Connect Claude Code:
+
+```bash
+claude mcp add --transport stdio --scope user \
+  --env METABASE_URL=https://metabase.example.com \
+  --env METABASE_API_KEY=mb_your_key \
+  --env METABASE_MCP_WRITE_MODE=read-only \
+  metabase -- mcp-for-metabase serve --transport stdio
+claude mcp list
+```
+
+In Codex or Claude Code, ask the agent to call `metabase_connection_test`.
+
+### Option B: Docker HTTP
+
+Use this when the MCP server should run as a long-lived local or remote HTTP service.
+
+Build and run the server against an existing Metabase:
+
+```bash
+git clone https://github.com/DominikPollok/mcp-for-metabase.git
+cd mcp-for-metabase
+docker build -t mcp-for-metabase .
+docker run --rm -p 8000:8000 \
+  -e METABASE_URL=https://metabase.example.com \
+  -e METABASE_API_KEY=mb_your_key \
+  -e METABASE_MCP_TRANSPORT=http \
+  -e METABASE_MCP_WRITE_MODE=read-only \
+  -e METABASE_MCP_SQL_GUARD_MODE=strict \
+  -e METABASE_MCP_SNAPSHOT_DIR=/data/snapshots \
+  -v mcp-for-metabase-data:/data \
+  mcp-for-metabase
+```
+
+Connect Codex:
+
+```bash
+codex mcp add metabase --url http://localhost:8000/mcp
+codex mcp list
+```
+
+Connect Claude Code:
+
+```bash
+claude mcp add --transport http --scope user metabase http://localhost:8000/mcp
+claude mcp list
+```
+
+For Docker on macOS or Windows connecting to a Metabase running on your host machine, use `METABASE_URL=http://host.docker.internal:3000`.
+
+## Local Metabase Playground
+
+Use this when you want disposable Metabase, Postgres, and MCP containers for testing.
 
 Create an environment file:
 
@@ -91,6 +174,8 @@ Core environment variables:
 | `METABASE_IMAGE` | Optional | Docker Compose Metabase image tag for local integration work. |
 | `METABASE_API_KEY` | Recommended | Preferred authentication method. |
 | `METABASE_USERNAME` / `METABASE_PASSWORD` | Optional | Session-auth fallback. |
+| `METABASE_HTTP_HEADERS_JSON` | Optional | JSON object of extra outbound headers for deployments behind a proxy, for example `{"X-Forwarded-User":"agent"}`. |
+| `METABASE_BASIC_AUTH_USERNAME` / `METABASE_BASIC_AUTH_PASSWORD` | Optional | Adds an outbound `Authorization: Basic ...` header for reverse proxies in front of Metabase. |
 | `METABASE_MCP_TRANSPORT` | Optional | `stdio` or `http`. |
 | `METABASE_MCP_WRITE_MODE` | Optional | `read-only`, `safe-writes`, or `all-writes`. |
 | `METABASE_MCP_SQL_GUARD_MODE` | Optional | `strict` by default. Use `disabled` only for trusted internal deployments. |
@@ -108,7 +193,7 @@ Write modes:
 - `safe-writes`: allows common create/update/content operations.
 - `all-writes`: allows destructive/admin operations only when the tool call also passes `confirm=true`.
 
-Every mutating request is audited when `METABASE_MCP_AUDIT_LOG` is set. Read [SECURITY.md](SECURITY.md) before connecting the server to production Metabase.
+Every mutating request is audited when `METABASE_MCP_AUDIT_LOG` is set. Read [docs/SECURITY.md](docs/SECURITY.md) before connecting the server to production Metabase.
 
 Native SQL guard:
 
@@ -145,7 +230,126 @@ The server exposes the complete generated operation catalog through `metabase_ap
 
 ## Connecting Agents
 
-Read [docs/CONNECTING_AGENTS.md](docs/CONNECTING_AGENTS.md) or use the optional Codex skill at [.codex/skills/connect-metabase-agents/SKILL.md](.codex/skills/connect-metabase-agents/SKILL.md).
+Choose exactly one connection style:
+
+- `stdio`: the client starts `mcp-for-metabase` on demand. This is simplest for one developer machine.
+- `http`: the MCP server runs separately, usually in Docker, and clients connect to `http://localhost:8000/mcp` or your hosted MCP URL.
+
+### Codex
+
+Codex CLI and the Codex IDE extension read MCP servers from `~/.codex/config.toml`. The `codex mcp add` command writes that file for you.
+
+Local stdio:
+
+```bash
+codex mcp add metabase \
+  --env METABASE_URL=https://metabase.example.com \
+  --env METABASE_API_KEY=mb_your_key \
+  --env METABASE_MCP_WRITE_MODE=read-only \
+  -- mcp-for-metabase serve --transport stdio
+codex mcp list
+```
+
+Equivalent `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.metabase]
+command = "mcp-for-metabase"
+args = ["serve", "--transport", "stdio"]
+enabled = true
+
+[mcp_servers.metabase.env]
+METABASE_URL = "https://metabase.example.com"
+METABASE_API_KEY = "mb_your_key"
+METABASE_MCP_WRITE_MODE = "read-only"
+```
+
+Docker or hosted HTTP:
+
+```bash
+codex mcp add metabase --url http://localhost:8000/mcp
+codex mcp list
+```
+
+Equivalent `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.metabase]
+url = "http://localhost:8000/mcp"
+enabled = true
+```
+
+### Claude Code
+
+Claude Code can add MCP servers with `claude mcp add`. Put all Claude Code options before the server name, then put the server command after `--`.
+
+Local stdio:
+
+```bash
+claude mcp add --transport stdio --scope user \
+  --env METABASE_URL=https://metabase.example.com \
+  --env METABASE_API_KEY=mb_your_key \
+  --env METABASE_MCP_WRITE_MODE=read-only \
+  metabase -- mcp-for-metabase serve --transport stdio
+claude mcp list
+```
+
+Project-level `.mcp.json` alternative:
+
+```json
+{
+  "mcpServers": {
+    "metabase": {
+      "type": "stdio",
+      "command": "mcp-for-metabase",
+      "args": ["serve", "--transport", "stdio"],
+      "env": {
+        "METABASE_URL": "https://metabase.example.com",
+        "METABASE_API_KEY": "mb_your_key",
+        "METABASE_MCP_WRITE_MODE": "read-only"
+      }
+    }
+  }
+}
+```
+
+Docker or hosted HTTP:
+
+```bash
+claude mcp add --transport http --scope user metabase http://localhost:8000/mcp
+claude mcp list
+```
+
+Inside Claude Code, run `/mcp` and confirm the `metabase` server is connected.
+
+### Claude Desktop
+
+Add the server to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "metabase": {
+      "type": "stdio",
+      "command": "mcp-for-metabase",
+      "args": ["serve", "--transport", "stdio"],
+      "env": {
+        "METABASE_URL": "https://metabase.example.com",
+        "METABASE_API_KEY": "mb_your_key",
+        "METABASE_MCP_WRITE_MODE": "read-only"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop after editing the config. If you already configured Claude Desktop and want the same server in Claude Code, run `claude mcp add-from-claude-desktop`.
+
+For proxy deployments, add `METABASE_BASIC_AUTH_USERNAME` and `METABASE_BASIC_AUTH_PASSWORD`, or set `METABASE_HTTP_HEADERS_JSON`.
+
+### Generic MCP Clients
+
+Read [docs/CONNECTING_AGENTS.md](docs/CONNECTING_AGENTS.md) for Docker HTTP, pip/pipx installation, and additional configuration options.
 
 Example stdio client config:
 
@@ -158,6 +362,8 @@ Example stdio client config:
       "env": {
         "METABASE_URL": "https://metabase.example.com",
         "METABASE_API_KEY": "mb_your_key",
+        "METABASE_BASIC_AUTH_USERNAME": "proxy_user",
+        "METABASE_BASIC_AUTH_PASSWORD": "proxy_password",
         "METABASE_MCP_WRITE_MODE": "read-only"
       }
     }
@@ -257,7 +463,7 @@ Generated outputs:
 - [Requirements](docs/REQUIREMENTS.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Security](SECURITY.md)
+- [Security](docs/SECURITY.md)
 - [Tool catalog](docs/TOOL_CATALOG.md)
 - [Capabilities](docs/CAPABILITIES.md)
 - [API coverage](docs/API_COVERAGE.md)
