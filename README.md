@@ -39,13 +39,13 @@ Use this when Codex or Claude Code should launch the MCP server as a local proce
 
 Install the command:
 
-From PyPI, after the first public release:
+From PyPI:
 
 ```bash
 pipx install mcp-for-metabase
 ```
 
-Before the first PyPI release, install from GitHub:
+If the PyPI package is not available yet, install from GitHub:
 
 ```bash
 pipx install git+https://github.com/DominikPollok/mcp-for-metabase.git

@@ -58,7 +58,7 @@ Install the command once:
 pipx install mcp-for-metabase
 ```
 
-Before the first PyPI release, install from GitHub:
+If the PyPI package is not available yet, install from GitHub:
 
 ```bash
 pipx install git+https://github.com/DominikPollok/mcp-for-metabase.git

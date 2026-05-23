@@ -60,8 +60,8 @@ python -m mcp_for_metabase.healthcheck
 ## Tag And Publish
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 After the release workflow completes, verify:

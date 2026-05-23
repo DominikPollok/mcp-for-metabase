@@ -10,6 +10,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Nothing yet.
 
+## [0.3.0] - 2026-05-23
+
+### Added
+
+- Copy/paste setup paths for Codex, Claude Code, Claude Desktop, generic MCP clients, local stdio, Docker HTTP, and Docker Compose playground workflows.
+- Support for outbound reverse-proxy authentication through `METABASE_BASIC_AUTH_USERNAME`, `METABASE_BASIC_AUTH_PASSWORD`, and `METABASE_HTTP_HEADERS_JSON`.
+- Runtime log redaction for sensitive credentials and configured extra headers.
+- HTTP host and port configuration via `METABASE_MCP_HTTP_HOST` and `METABASE_MCP_HTTP_PORT`.
+- Additional tests for proxy headers, log redaction, HTTP server options, and generic API request parameters.
+
+### Changed
+
+- Improved first-run documentation around Metabase API keys, least-privileged access, read-only defaults, and agent connection verification.
+- Updated CI and release workflow actions to the current major versions.
+- Expanded the MCP agent connection guide and in-server connection resource with proxy-authentication guidance.
+
 ## [0.1.0] - 2026-05-23
 
 ### Added
