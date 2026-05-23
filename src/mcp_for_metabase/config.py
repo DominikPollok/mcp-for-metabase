@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import base64
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +33,18 @@ class Settings(BaseSettings):
     metabase_api_key: SecretStr | None = Field(default=None, alias="METABASE_API_KEY")
     metabase_username: str | None = Field(default=None, alias="METABASE_USERNAME")
     metabase_password: SecretStr | None = Field(default=None, alias="METABASE_PASSWORD")
+    metabase_http_headers: dict[str, str] = Field(
+        default_factory=dict,
+        alias="METABASE_HTTP_HEADERS_JSON",
+    )
+    metabase_basic_auth_username: str | None = Field(
+        default=None,
+        alias="METABASE_BASIC_AUTH_USERNAME",
+    )
+    metabase_basic_auth_password: SecretStr | None = Field(
+        default=None,
+        alias="METABASE_BASIC_AUTH_PASSWORD",
+    )
     metabase_mcp_transport: Transport = Field(
         default=Transport.STDIO, alias="METABASE_MCP_TRANSPORT"
     )
@@ -51,6 +64,13 @@ class Settings(BaseSettings):
         default=SqlGuardMode.STRICT,
         alias="METABASE_MCP_SQL_GUARD_MODE",
     )
+
+    @field_validator("metabase_http_headers", mode="before")
+    @classmethod
+    def empty_headers_are_empty_dict(cls, value: object) -> object:
+        if value == "":
+            return {}
+        return value
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":
@@ -79,3 +99,15 @@ class Settings(BaseSettings):
     @property
     def sql_guard_mode(self) -> SqlGuardMode:
         return self.metabase_mcp_sql_guard_mode
+
+    @property
+    def outbound_headers(self) -> dict[str, str]:
+        headers = dict(self.metabase_http_headers)
+        if self.metabase_basic_auth_username and self.metabase_basic_auth_password:
+            credentials = (
+                f"{self.metabase_basic_auth_username}:"
+                f"{self.metabase_basic_auth_password.get_secret_value()}"
+            )
+            encoded = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
+            headers["Authorization"] = f"Basic {encoded}"
+        return headers

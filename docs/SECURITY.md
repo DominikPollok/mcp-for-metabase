@@ -9,6 +9,11 @@ Use `METABASE_API_KEY` whenever possible. API keys inherit group permissions in 
 
 Session auth is supported only as a fallback with `METABASE_USERNAME` and `METABASE_PASSWORD`.
 
+For Metabase instances behind a reverse proxy, use `METABASE_BASIC_AUTH_USERNAME`
+and `METABASE_BASIC_AUTH_PASSWORD` or `METABASE_HTTP_HEADERS_JSON` for upstream
+proxy authentication. Do not embed proxy credentials in `METABASE_URL`; URL
+userinfo is more likely to leak through process listings and HTTP client logs.
+
 ## Write modes
 
 - `read-only`: default. Mutating requests are blocked.

@@ -24,6 +24,62 @@ def settings(
 
 
 @pytest.mark.asyncio
+async def test_client_sends_extra_headers_and_basic_auth() -> None:
+    seen_headers: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen_headers.update(request.headers)
+        return httpx.Response(200, json={"ok": True})
+
+    client = MetabaseClient(
+        Settings(
+            METABASE_URL="http://metabase.test",
+            METABASE_API_KEY=SecretStr("mb_key"),
+            METABASE_HTTP_HEADERS_JSON={"X-Proxy-User": "agent"},
+            METABASE_BASIC_AUTH_USERNAME="proxy",
+            METABASE_BASIC_AUTH_PASSWORD=SecretStr("secret"),
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        await client.request("GET", "/api/session/properties")
+    finally:
+        await client.aclose()
+
+    assert seen_headers["authorization"] == "Basic cHJveHk6c2VjcmV0"
+    assert seen_headers["x-proxy-user"] == "agent"
+    assert seen_headers["x-api-key"] == "mb_key"
+
+
+@pytest.mark.asyncio
+async def test_session_auth_uses_proxy_headers_during_login() -> None:
+    seen_login_headers: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/session":
+            seen_login_headers.update(request.headers)
+            return httpx.Response(200, json={"id": "session-1"})
+        return httpx.Response(200, json={"ok": True})
+
+    client = MetabaseClient(
+        Settings(
+            METABASE_URL="http://metabase.test",
+            METABASE_USERNAME="user@example.com",
+            METABASE_PASSWORD=SecretStr("password"),
+            METABASE_BASIC_AUTH_USERNAME="proxy",
+            METABASE_BASIC_AUTH_PASSWORD=SecretStr("secret"),
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        await client.request("GET", "/api/session/properties")
+    finally:
+        await client.aclose()
+
+    assert seen_login_headers["authorization"] == "Basic cHJveHk6c2VjcmV0"
+
+
+@pytest.mark.asyncio
 async def test_client_sends_api_key_and_parses_json() -> None:
     seen_headers: dict[str, str] = {}
 
@@ -134,6 +190,21 @@ async def test_client_raises_structured_error() -> None:
 
     assert exc.value.status_code == 403
     assert exc.value.response_body == {"message": "Forbidden"}
+
+
+@pytest.mark.asyncio
+async def test_client_identifies_proxy_basic_auth_401() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, headers={"WWW-Authenticate": "Basic realm=proxy"})
+
+    client = MetabaseClient(settings(), transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(MetabaseError) as exc:
+            await client.request("GET", "/api/session/properties")
+    finally:
+        await client.aclose()
+
+    assert "upstream proxy authentication" in str(exc.value)
 
 
 @pytest.mark.asyncio

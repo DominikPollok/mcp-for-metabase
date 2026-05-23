@@ -30,6 +30,11 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         return await with_client(lambda client: tools.list_databases(client))
 
     @mcp.tool()
+    async def metabase_collection_tree() -> dict[str, Any]:
+        """Return the visible Metabase collection hierarchy."""
+        return await with_client(lambda client: tools.collection_tree(client))
+
+    @mcp.tool()
     async def metabase_get_database_metadata(database_id: int) -> dict[str, Any]:
         return await with_client(
             lambda client: tools.get_database_metadata(client, database_id=database_id),

@@ -42,6 +42,7 @@ async def test_mcp_native_discovery_lists_tools_resources_and_prompts() -> None:
         "metabase_sync_database_schema",
         "metabase_create_pulse",
         "metabase_list_bookmarks",
+        "metabase_collection_tree",
         "metabase_revert_revision",
         "metabase_create_timeline",
         "metabase_create_segment",

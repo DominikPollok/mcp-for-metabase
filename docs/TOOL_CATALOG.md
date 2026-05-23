@@ -8,6 +8,7 @@
 - `metabase_snapshot_entity`: snapshots a dashboard, card, collection, or permissions graph and persists it locally.
 - `metabase_list_saved_snapshots`: lists locally persisted rollback snapshots.
 - `metabase_search`: searches cards, dashboards, collections, and related content.
+- `metabase_collection_tree`: returns the visible collection hierarchy.
 - `metabase_list_databases`: lists databases visible to the API key.
 - `metabase_get_database_metadata`: inspects database schemas, tables, and fields.
 - `metabase_get_table_metadata`: inspects a table's query metadata.

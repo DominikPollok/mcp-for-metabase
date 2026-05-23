@@ -48,6 +48,11 @@ def register_resources(mcp: FastMCP, context: McpAppContext) -> None:
             "http_command": "mcp-for-metabase serve --transport http --host 0.0.0.0 --port 8000",
             "required_env": ["METABASE_URL"],
             "auth_env": ["METABASE_API_KEY", "METABASE_USERNAME", "METABASE_PASSWORD"],
+            "proxy_auth_env": [
+                "METABASE_HTTP_HEADERS_JSON",
+                "METABASE_BASIC_AUTH_USERNAME",
+                "METABASE_BASIC_AUTH_PASSWORD",
+            ],
             "write_modes": ["read-only", "safe-writes", "all-writes"],
             "discovery": {
                 "native": ["tools/list", "resources/list", "prompts/list"],
