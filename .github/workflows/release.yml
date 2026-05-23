@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          cache-suffix: release-validate
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-extras
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run pytest
+      - run: docker compose config --quiet
+      - run: docker build -t mcp-for-metabase:release .
+      - run: |
+          docker run --rm mcp-for-metabase:release python -c "import asyncio; from mcp_for_metabase.registry import ApiRegistry, OpenApiSpec; from mcp_for_metabase.server import create_mcp; mcp = create_mcp(); tools = asyncio.run(mcp.list_tools()); assert len(ApiRegistry.load_default().operations) == 600; assert len(OpenApiSpec.load_default().spec.get('paths', {})) == 484; assert len(tools) >= 100"
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          cache-suffix: release-publish
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-extras
+      - run: uv run python -m build
+      - run: uv run twine check dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
