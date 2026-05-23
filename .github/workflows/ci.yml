@@ -12,9 +12,9 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --all-extras
@@ -26,9 +26,9 @@ jobs:
   registry:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: uv sync --all-extras
@@ -38,7 +38,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: docker compose config --quiet
       - run: docker build -t mcp-for-metabase:ci .
       - run: |
@@ -53,9 +53,9 @@ jobs:
     env:
       METABASE_IMAGE: metabase/metabase:${{ matrix.metabase-version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: uv sync --all-extras
@@ -75,9 +75,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, registry, docker, integration]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: uv sync --all-extras
