@@ -34,14 +34,14 @@ def register_generic_tools(mcp: FastMCP, context: McpAppContext) -> None:
 
     @mcp.tool()
     async def metabase_api_request(
-        operation_id: str,
+        operation_id: str | None = None,
         path_params: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         body: Any | None = None,
         dry_run: bool = False,
         confirm: bool = False,
     ) -> dict[str, Any]:
-        """Execute any generated Metabase API operation through the central safety policy."""
+        """Execute an operation; use metabase_discover_operations to find operation_id values."""
         return await with_client(
             lambda client: tools.metabase_api_request(
                 client,

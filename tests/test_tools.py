@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 from pydantic import SecretStr
@@ -12,6 +14,7 @@ from mcp_for_metabase.tools import (
     archive_dashboard,
     clear_cache,
     collection_tree,
+    connection_test,
     copy_card,
     copy_dashboard,
     copy_document,
@@ -147,6 +150,26 @@ async def test_run_query_still_blocks_unsafe_native_sql() -> None:
 
 
 @pytest.mark.asyncio
+async def test_connection_test_returns_compact_identity_and_version() -> None:
+    requested_paths: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path == "/api/user/current":
+            return httpx.Response(200, json={"id": 17, "email": "agent@example.test"})
+        return httpx.Response(200, json={"version": "v0.61.2.8", "smtp-host": "large-setting"})
+
+    client = make_client(httpx.MockTransport(handler))
+    try:
+        response = await connection_test(client)
+    finally:
+        await client.aclose()
+
+    assert requested_paths == ["/api/user/current", "/api/session/properties"]
+    assert response["data"] == {"ok": True, "version": "v0.61.2.8", "user_id": 17}
+
+
+@pytest.mark.asyncio
 async def test_card_parameters_and_dashboard_tabs_are_forwarded() -> None:
     client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
     try:
@@ -167,7 +190,84 @@ async def test_card_parameters_and_dashboard_tabs_are_forwarded() -> None:
         await client.aclose()
 
     assert card["request"]["body"]["parameters"] == [{"id": "status", "type": "category"}]
+    assert dashboard["request"]["path"] == "/api/dashboard/3/cards"
+    assert dashboard["request"]["body"]["cards"] == []
     assert dashboard["request"]["body"]["tabs"] == [{"id": -1, "name": "Overview"}]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_tab_update_preserves_existing_dashcards_on_layout_endpoint() -> None:
+    sent_body: dict[str, object] = {}
+    sent_path = ""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal sent_path
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={"dashcards": [{"id": 8, "card_id": None, "dashboard_tab_id": 1}]},
+            )
+        sent_path = request.url.path
+        sent_body.update(json.loads(request.read()))
+        return httpx.Response(200, json={"ok": True})
+
+    client = make_client(httpx.MockTransport(handler))
+    try:
+        await update_dashboard(
+            client,
+            dashboard_id=3,
+            updates={"tabs": [{"id": 1, "name": "Overview"}, {"id": -1, "name": "Physicians"}]},
+        )
+    finally:
+        await client.aclose()
+
+    assert sent_path == "/api/dashboard/3/cards"
+    assert sent_body["cards"] == [{"id": 8, "card_id": None, "dashboard_tab_id": 1}]
+    assert sent_body["tabs"] == [{"id": 1, "name": "Overview"}, {"id": -1, "name": "Physicians"}]
+
+
+@pytest.mark.asyncio
+async def test_get_dashboard_can_select_fields_and_compact_dashcards() -> None:
+    dashboard_data = {
+        "id": 4,
+        "name": "Busy",
+        "tabs": [{"id": 1, "name": "Summary"}],
+        "dashcards": [
+            {
+                "id": 8,
+                "card_id": None,
+                "row": 0,
+                "col": 0,
+                "size_x": 6,
+                "size_y": 2,
+                "dashboard_tab_id": 1,
+                "card": {"large": "omitted"},
+            }
+        ],
+    }
+    client = make_client(
+        httpx.MockTransport(lambda _request: httpx.Response(200, json=dashboard_data))
+    )
+    try:
+        response = await get_dashboard(
+            client,
+            dashboard_id=4,
+            include=["tabs", "dashcards"],
+            compact=True,
+        )
+    finally:
+        await client.aclose()
+
+    assert set(response["data"]) == {"tabs", "dashcards"}
+    assert response["data"]["dashcards"][0] == {
+        "id": 8,
+        "card_id": None,
+        "row": 0,
+        "col": 0,
+        "size_x": 6,
+        "size_y": 2,
+        "dashboard_tab_id": 1,
+    }
 
 
 @pytest.mark.asyncio
@@ -243,6 +343,79 @@ async def test_generic_executor_validates_openapi_schema() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operation_id", "cards_field"),
+    [
+        ("put_api_dashboard_id", "dashcards"),
+        ("put_api_dashboard_id_cards", "cards"),
+    ],
+)
+async def test_generic_executor_allows_dashboard_layout_shapes_missing_from_openapi(
+    operation_id: str,
+    cards_field: str,
+) -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    body = {
+        cards_field: [
+            {
+                "id": 8,
+                "card_id": None,
+                "row": 0,
+                "col": 0,
+                "size_x": 6,
+                "size_y": 2,
+                "parameter_mappings": [
+                    {"parameter_id": "filter", "target": ["text-tag", "physician"]}
+                ],
+            }
+        ],
+        "tabs": [{"id": -1, "name": "Physicians"}],
+    }
+    try:
+        response = await metabase_api_request(
+            client,
+            operation_id=operation_id,
+            path_params={"id": 4},
+            body=body,
+            dry_run=True,
+        )
+    finally:
+        await client.aclose()
+
+    assert response["request"]["body"] == body
+
+
+@pytest.mark.asyncio
+async def test_generic_executor_hints_at_discovery_when_operation_id_is_missing() -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    try:
+        with pytest.raises(RegistryError) as exc:
+            await metabase_api_request(client)
+    finally:
+        await client.aclose()
+
+    assert "metabase_discover_operations" in str(exc.value)
+    assert "hint" in exc.value.response_body
+
+
+@pytest.mark.asyncio
+async def test_dashboard_rejects_mixed_layout_and_metadata_updates() -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    try:
+        with pytest.raises(RegistryError) as exc:
+            await update_dashboard(
+                client,
+                dashboard_id=4,
+                updates={"name": "Renamed", "tabs": [{"id": -1, "name": "New"}]},
+                dry_run=True,
+            )
+    finally:
+        await client.aclose()
+
+    assert "separately" in str(exc.value)
+
+
+@pytest.mark.asyncio
 async def test_generic_executor_uses_sql_guard_for_native_queries() -> None:
     client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
     try:
@@ -309,6 +482,7 @@ async def test_update_dashboard_cards_and_snippet_dry_runs() -> None:
             client,
             dashboard_id=3,
             cards=[{"id": 10, "row": 0, "col": 0, "size_x": 6, "size_y": 4}],
+            tabs=[{"id": -1, "name": "Physicians"}],
             dry_run=True,
         )
         added = await add_dashboard_card(
@@ -319,6 +493,7 @@ async def test_update_dashboard_cards_and_snippet_dry_runs() -> None:
             col=6,
             size_x=6,
             size_y=4,
+            dashboard_tab_id=2,
             dry_run=True,
         )
         snippet = await create_native_query_snippet(
@@ -332,9 +507,11 @@ async def test_update_dashboard_cards_and_snippet_dry_runs() -> None:
 
     assert layout["request"]["path"] == "/api/dashboard/3/cards"
     assert layout["request"]["body"]["cards"][0]["id"] == 10
+    assert layout["request"]["body"]["tabs"] == [{"id": -1, "name": "Physicians"}]
     assert added["request"]["method"] == "PUT"
     assert added["request"]["body"]["cards"][0]["id"] == -1
     assert added["request"]["body"]["cards"][0]["card_id"] == 9
+    assert added["request"]["body"]["cards"][0]["dashboard_tab_id"] == 2
     assert snippet["request"]["path"] == "/api/native-query-snippet"
     assert snippet["request"]["body"]["content"] == "where active = true"
 

@@ -4,6 +4,45 @@ from typing import Any
 from mcp_for_metabase.application.common import omit_none, response_items
 from mcp_for_metabase.application.query import search
 from mcp_for_metabase.client import MetabaseClient
+from mcp_for_metabase.errors import RegistryError
+
+_COMPACT_DASHCARD_FIELDS = (
+    "id",
+    "card_id",
+    "row",
+    "col",
+    "size_x",
+    "size_y",
+    "dashboard_tab_id",
+    "parameter_mappings",
+)
+_LAYOUT_DASHCARD_FIELDS = (*_COMPACT_DASHCARD_FIELDS, "series", "inline_parameters")
+
+
+def _dashboard_layout_cards(response: dict[str, Any]) -> list[dict[str, Any]]:
+    data = response.get("data", {})
+    dashcards = data.get("dashcards", []) if isinstance(data, dict) else []
+    if not isinstance(dashcards, list):
+        return []
+    return [
+        {key: card[key] for key in _LAYOUT_DASHCARD_FIELDS if key in card}
+        for card in dashcards
+        if isinstance(card, dict)
+    ]
+
+
+def _compact_dashcards(data: dict[str, Any]) -> dict[str, Any]:
+    dashcards = data.get("dashcards")
+    if not isinstance(dashcards, list):
+        return data
+    return {
+        **data,
+        "dashcards": [
+            {key: card[key] for key in _COMPACT_DASHCARD_FIELDS if key in card}
+            for card in dashcards
+            if isinstance(card, dict)
+        ],
+    }
 
 
 async def collection_tree(client: MetabaseClient) -> dict[str, Any]:
@@ -305,13 +344,26 @@ async def create_or_update_dashboard(
     )
 
 
-async def get_dashboard(client: MetabaseClient, *, dashboard_id: int) -> dict[str, Any]:
-    return await client.request(
+async def get_dashboard(
+    client: MetabaseClient,
+    *,
+    dashboard_id: int,
+    include: list[str] | None = None,
+    compact: bool = False,
+) -> dict[str, Any]:
+    response = await client.request(
         "GET",
         "/api/dashboard/{id}",
         operation_id="get_api_dashboard_id",
         path_params={"id": dashboard_id},
     )
+    data = response.get("data")
+    if not isinstance(data, dict) or (include is None and not compact):
+        return response
+    projected = data if include is None else {key: data[key] for key in include if key in data}
+    if compact:
+        projected = _compact_dashcards(projected)
+    return {**response, "data": projected}
 
 
 async def update_dashboard(
@@ -322,6 +374,40 @@ async def update_dashboard(
     dry_run: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
+    layout_keys = {"tabs", "dashcards"}
+    if layout_keys.intersection(updates):
+        metadata_keys = set(updates).difference(layout_keys)
+        if metadata_keys:
+            raise RegistryError(
+                "Dashboard layout and metadata updates must be sent separately",
+                response_body={
+                    "layout_fields": sorted(layout_keys.intersection(updates)),
+                    "metadata_fields": sorted(metadata_keys),
+                    "hint": (
+                        "Call metabase_update_dashboard once for metadata and once "
+                        "for tabs/dashcards."
+                    ),
+                },
+            )
+        cards = updates.get("dashcards")
+        if cards is None:
+            cards = (
+                []
+                if dry_run
+                else _dashboard_layout_cards(await get_dashboard(client, dashboard_id=dashboard_id))
+            )
+        body = {"cards": cards}
+        if "tabs" in updates:
+            body["tabs"] = updates["tabs"]
+        return await client.request(
+            "PUT",
+            "/api/dashboard/{id}/cards",
+            operation_id="put_api_dashboard_id_cards",
+            path_params={"id": dashboard_id},
+            body=body,
+            dry_run=dry_run,
+            confirm=confirm,
+        )
     return await client.request(
         "PUT",
         "/api/dashboard/{id}",
@@ -401,6 +487,7 @@ async def add_dashboard_card(
     col: int,
     size_x: int,
     size_y: int,
+    dashboard_tab_id: int | None = None,
     parameter_mappings: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
@@ -414,6 +501,8 @@ async def add_dashboard_card(
         "parameter_mappings": parameter_mappings or [],
         "series": [],
     }
+    if dashboard_tab_id is not None:
+        new_card["dashboard_tab_id"] = dashboard_tab_id
     cards = [new_card]
     if not dry_run:
         dashboard = await get_dashboard(client, dashboard_id=dashboard_id)
@@ -433,6 +522,7 @@ async def add_dashboard_card(
                             "col",
                             "size_x",
                             "size_y",
+                            "dashboard_tab_id",
                             "parameter_mappings",
                             "series",
                             "inline_parameters",
@@ -456,15 +546,19 @@ async def update_dashboard_cards(
     *,
     dashboard_id: int,
     cards: list[dict[str, Any]],
+    tabs: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
+    body: dict[str, Any] = {"cards": cards}
+    if tabs is not None:
+        body["tabs"] = tabs
     return await client.request(
         "PUT",
         "/api/dashboard/{id}/cards",
         operation_id="put_api_dashboard_id_cards",
         path_params={"id": dashboard_id},
-        body={"cards": cards},
+        body=body,
         dry_run=dry_run,
         confirm=confirm,
     )

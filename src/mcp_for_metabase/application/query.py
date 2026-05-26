@@ -5,11 +5,26 @@ from mcp_for_metabase.client import MetabaseClient
 
 
 async def connection_test(client: MetabaseClient) -> dict[str, Any]:
-    return await client.request(
+    user_response = await client.request(
+        "GET",
+        "/api/user/current",
+        operation_id="get_api_user_current",
+    )
+    properties_response = await client.request(
         "GET",
         "/api/session/properties",
         operation_id="get_api_session_properties",
     )
+    user = user_response.get("data", {})
+    properties = properties_response.get("data", {})
+    return {
+        **user_response,
+        "data": {
+            "ok": True,
+            "version": properties.get("version") if isinstance(properties, dict) else None,
+            "user_id": user.get("id") if isinstance(user, dict) else None,
+        },
+    }
 
 
 async def search(

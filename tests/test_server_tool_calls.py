@@ -32,7 +32,27 @@ async def test_card_parameters_and_dashboard_tabs_are_exposed_by_mcp_tools() -> 
     )
 
     assert card["request"]["body"]["parameters"] == [{"id": "status", "type": "category"}]
+    assert dashboard["request"]["path"] == "/api/dashboard/3/cards"
     assert dashboard["request"]["body"]["tabs"] == [{"id": -1, "name": "Overview"}]
+
+
+@pytest.mark.asyncio
+async def test_native_query_tool_exposes_native_dataset_body() -> None:
+    response = await call_tool(
+        "metabase_run_query",
+        {
+            "database_id": 3,
+            "query_type": "native",
+            "query": {"query": "SELECT 1"},
+            "dry_run": True,
+        },
+    )
+
+    assert response["request"]["body"] == {
+        "database": 3,
+        "type": "native",
+        "native": {"query": "SELECT 1"},
+    }
 
 
 @pytest.mark.asyncio
@@ -86,7 +106,12 @@ async def test_card_parameters_and_dashboard_tabs_are_exposed_by_mcp_tools() -> 
         ),
         (
             "metabase_update_dashboard_cards",
-            {"dashboard_id": 3, "cards": [{"id": 4, "row": 0, "col": 0}], "dry_run": True},
+            {
+                "dashboard_id": 3,
+                "cards": [{"id": 4, "row": 0, "col": 0}],
+                "tabs": [{"id": -1, "name": "New"}],
+                "dry_run": True,
+            },
             "/api/dashboard/3/cards",
         ),
         (

@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+from copy import deepcopy
 from typing import Any
 
 from jsonschema.exceptions import ValidationError
@@ -6,6 +7,25 @@ from jsonschema.validators import validator_for
 
 from mcp_for_metabase.errors import RegistryError
 from mcp_for_metabase.registry import OpenApiSpec
+
+
+def _compatible_request_schema(operation_id: str, schema: dict[str, Any]) -> dict[str, Any]:
+    """Allow dashboard card payload shapes accepted by Metabase but absent from OpenAPI."""
+    field = {
+        "put_api_dashboard_id": "dashcards",
+        "put_api_dashboard_id_cards": "cards",
+    }.get(operation_id)
+    if field is None:
+        return schema
+    compatible = deepcopy(schema)
+    properties = compatible.get("properties")
+    if not isinstance(properties, dict) or field not in properties:
+        return schema
+    array_schema: dict[str, Any] = {"type": "array", "items": {"type": "object"}}
+    properties[field] = (
+        {"oneOf": [array_schema, {"type": "null"}]} if field == "dashcards" else array_schema
+    )
+    return compatible
 
 
 def _has_param(params: dict[str, Any] | None, name: str) -> bool:
@@ -115,7 +135,7 @@ def validate_api_request(
         return
 
     _validate_schema(
-        schema=schema,
+        schema=_compatible_request_schema(operation.operation_id, schema),
         value=body,
         operation_id=operation.operation_id,
         location="body",

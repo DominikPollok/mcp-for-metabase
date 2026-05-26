@@ -13,7 +13,7 @@ Support levels:
 | Metabase API area | Generated operations | Current MCP support | Notes |
 | --- | ---: | --- | --- |
 | API discovery and coverage | 600 total | Curated tools + resources | `metabase_discover_operations`, `metabase_get_operation`, `metabase://api/coverage`, and `metabase://api/operations`. |
-| Dashboard authoring | 25 dashboard ops | Curated tools + generic API | Create/get/update/archive/delete/copy dashboards, public links, parameters, tabs via dashboard updates, durable snapshots, saved snapshot restore, and dashboard card layouts are curated. Subscriptions are generic today. |
+| Dashboard authoring | 25 dashboard ops | Curated tools + generic API | Create/get/update/archive/delete/copy dashboards, public links, parameters, tabs via layout updates, compact dashboard reads, durable snapshots, saved snapshot restore, and dashboard card layouts are curated. Subscriptions are generic today. |
 | Cards/questions/models | 20 card ops | Curated tools + generic API | Create/get/update/archive/delete/copy/query/export/public-link card workflows, series reads, and durable snapshots are curated. Remapping helpers are generic. |
 | Collections | 16 ops | Curated tools + generic API | Create, create-or-update, update, archive, and tree are covered; item movement and detailed collection item APIs are generic. |
 | Databases, tables, fields, metadata | 31 database ops, 16 table ops, 12 field ops | Curated read tools + generic API | Database metadata inspection is curated. Database/table/field admin writes are generic and safety-gated. |

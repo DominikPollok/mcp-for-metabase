@@ -2,7 +2,7 @@
 
 ## Read tools
 
-- `metabase_connection_test`: verifies auth and returns instance properties.
+- `metabase_connection_test`: verifies auth and returns compact `ok`, `version`, and `user_id` data.
 - `metabase_discover_operations`: searches the generated Metabase API catalog.
 - `metabase_get_operation`: returns method, path, tags, parameters, docs metadata, and safety tier for one operation.
 - `metabase_snapshot_entity`: snapshots a dashboard, card, collection, or permissions graph and persists it locally.
@@ -49,8 +49,8 @@
 - `metabase_delete_card_public_link`: deletes a card public link with destructive confirmation gates.
 - `metabase_create_dashboard`: creates a dashboard.
 - `metabase_create_or_update_dashboard`: creates a dashboard or updates an exact-name match.
-- `metabase_get_dashboard`: returns a dashboard.
-- `metabase_update_dashboard`: updates dashboard metadata, tabs, settings, or parameters.
+- `metabase_get_dashboard`: returns a dashboard; use `include` for selected top-level fields and `compact=true` to reduce dashcard payloads.
+- `metabase_update_dashboard`: updates dashboard metadata/settings/parameters or layout tabs/dashcards; send metadata and layout in separate calls.
 - `metabase_update_dashboard_parameters`: replaces dashboard filters/parameters.
 - `metabase_get_dashboard_items`: lists dashboard items/cards.
 - `metabase_archive_dashboard`: moves a dashboard to trash.
@@ -58,10 +58,10 @@
 - `metabase_copy_dashboard`: copies a dashboard.
 - `metabase_create_dashboard_public_link`: creates or returns a dashboard public link.
 - `metabase_delete_dashboard_public_link`: deletes a dashboard public link with destructive confirmation gates.
-- `metabase_add_dashboard_card`: adds a card to a dashboard with grid position.
-- `metabase_update_dashboard_cards`: replaces/updates dashboard card layout via `PUT /api/dashboard/{id}/cards`.
+- `metabase_add_dashboard_card`: adds a card to a dashboard with grid position and optional `dashboard_tab_id`.
+- `metabase_update_dashboard_cards`: replaces/updates dashboard card layout and optional tabs via `PUT /api/dashboard/{id}/cards`.
 - `metabase_remove_dashboard_card`: removes a dashcard from a dashboard with destructive confirmation gates.
-- `metabase_run_query`: runs a Metabase dataset query.
+- `metabase_run_query`: runs a Metabase dataset query; for native SQL pass `database_id`, `query_type="native"`, and `query={"query": "SELECT ..."}`.
 - `metabase_create_native_query_snippet`: creates a reusable SQL snippet.
 - `metabase_list_native_query_snippets`: lists reusable SQL snippets.
 - `metabase_get_native_query_snippet`: gets a reusable SQL snippet.
@@ -109,10 +109,10 @@ All write-capable dashboard authoring tools accept `dry_run`.
 
 ## Generic tool
 
-- `metabase_api_request`: calls an operation from the OpenAPI registry with `operation_id`, `path_params`, `query`, `body`, `dry_run`, and `confirm`.
+- `metabase_api_request`: calls an operation from the OpenAPI registry with `operation_id`, `path_params`, `query`, `body`, `dry_run`, and `confirm`; when an ID is omitted, its error points to `metabase_discover_operations`.
 
 Use the generic tool for API areas that are not yet ergonomic enough for a curated high-level MCP tool.
-The generic tool validates required path parameters, required query parameters, path/query parameter schemas, required top-level JSON body fields, and JSON request-body schemas before sending the request.
+The generic tool validates required path parameters, required query parameters, path/query parameter schemas, required top-level JSON body fields, and JSON request-body schemas before sending the request. Dashboard layout card entries are passed through as opaque objects because current Metabase responses contain valid `card_id` and parameter mapping shapes that are narrower than the published request schema.
 
 The generated registry currently covers 600 operations from the official Metabase OpenAPI document.
 

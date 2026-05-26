@@ -13,7 +13,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
 
     @mcp.tool()
     async def metabase_connection_test() -> dict[str, Any]:
-        """Verify Metabase connectivity and authentication."""
+        """Verify connectivity/authentication and return compact identity/version data."""
         return await with_client(lambda client: tools.connection_test(client))
 
     @mcp.tool()
@@ -336,10 +336,19 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         )
 
     @mcp.tool()
-    async def metabase_get_dashboard(dashboard_id: int) -> dict[str, Any]:
-        """Get a dashboard by ID."""
+    async def metabase_get_dashboard(
+        dashboard_id: int,
+        include: list[str] | None = None,
+        compact: bool = False,
+    ) -> dict[str, Any]:
+        """Get a dashboard, optionally selecting top-level fields and compacting dashcards."""
         return await with_client(
-            lambda client: tools.get_dashboard(client, dashboard_id=dashboard_id),
+            lambda client: tools.get_dashboard(
+                client,
+                dashboard_id=dashboard_id,
+                include=include,
+                compact=compact,
+            ),
         )
 
     @mcp.tool()
@@ -425,6 +434,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         col: int,
         size_x: int,
         size_y: int,
+        dashboard_tab_id: int | None = None,
         parameter_mappings: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
@@ -437,6 +447,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
                 col=col,
                 size_x=size_x,
                 size_y=size_y,
+                dashboard_tab_id=dashboard_tab_id,
                 parameter_mappings=parameter_mappings,
                 dry_run=dry_run,
             ),
@@ -446,6 +457,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
     async def metabase_update_dashboard_cards(
         dashboard_id: int,
         cards: list[dict[str, Any]],
+        tabs: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
         confirm: bool = False,
     ) -> dict[str, Any]:
@@ -455,6 +467,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
                 client,
                 dashboard_id=dashboard_id,
                 cards=cards,
+                tabs=tabs,
                 dry_run=dry_run,
                 confirm=confirm,
             ),
