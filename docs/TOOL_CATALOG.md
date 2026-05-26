@@ -36,10 +36,10 @@
 - `metabase_restore_saved_snapshot`: restores a persisted snapshot by `snapshot_id`.
 - `metabase_update_collection`: updates a collection.
 - `metabase_archive_collection`: moves a collection to trash.
-- `metabase_create_card`: creates a question/card.
-- `metabase_create_or_update_card`: creates a card/question or updates an exact-name match.
+- `metabase_create_card`: creates a question/card, including optional card-level parameters.
+- `metabase_create_or_update_card`: creates or updates a card/question, including optional card-level parameters.
 - `metabase_get_card`: returns a card/question.
-- `metabase_update_card`: updates a card/question.
+- `metabase_update_card`: updates a card/question, including card-level parameters.
 - `metabase_archive_card`: moves a card/question to trash.
 - `metabase_delete_card`: deletes a card/question with destructive confirmation gates.
 - `metabase_copy_card`: copies a card/question.
@@ -50,7 +50,7 @@
 - `metabase_create_dashboard`: creates a dashboard.
 - `metabase_create_or_update_dashboard`: creates a dashboard or updates an exact-name match.
 - `metabase_get_dashboard`: returns a dashboard.
-- `metabase_update_dashboard`: updates dashboard metadata, settings, or parameters.
+- `metabase_update_dashboard`: updates dashboard metadata, tabs, settings, or parameters.
 - `metabase_update_dashboard_parameters`: replaces dashboard filters/parameters.
 - `metabase_get_dashboard_items`: lists dashboard items/cards.
 - `metabase_archive_dashboard`: moves a dashboard to trash.

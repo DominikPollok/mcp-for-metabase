@@ -110,6 +110,7 @@ async def create_card(
     collection_id: int | None = None,
     visualization_settings: dict[str, Any] | None = None,
     description: str | None = None,
+    parameters: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     body = {
@@ -119,6 +120,7 @@ async def create_card(
         "collection_id": collection_id,
         "visualization_settings": visualization_settings or {},
         "description": description,
+        "parameters": parameters,
         "type": "question",
     }
     return await client.request(
@@ -139,6 +141,7 @@ async def create_or_update_card(
     collection_id: int | None = None,
     visualization_settings: dict[str, Any] | None = None,
     description: str | None = None,
+    parameters: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
@@ -158,6 +161,7 @@ async def create_or_update_card(
                             "collection_id": collection_id,
                             "visualization_settings": visualization_settings or {},
                             "description": description,
+                            "parameters": parameters,
                             "type": "question",
                         }
                     ),
@@ -172,6 +176,7 @@ async def create_or_update_card(
         collection_id=collection_id,
         visualization_settings=visualization_settings,
         description=description,
+        parameters=parameters,
         dry_run=dry_run,
     )
 

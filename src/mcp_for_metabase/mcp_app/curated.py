@@ -193,8 +193,10 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         collection_id: int | None = None,
         visualization_settings: dict[str, Any] | None = None,
         description: str | None = None,
+        parameters: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
+        """Create a card/question, optionally with card-level filter parameters."""
         return await with_client(
             lambda client: tools.create_card(
                 client,
@@ -204,6 +206,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
                 collection_id=collection_id,
                 visualization_settings=visualization_settings,
                 description=description,
+                parameters=parameters,
                 dry_run=dry_run,
             ),
         )
@@ -216,10 +219,11 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         collection_id: int | None = None,
         visualization_settings: dict[str, Any] | None = None,
         description: str | None = None,
+        parameters: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
         confirm: bool = False,
     ) -> dict[str, Any]:
-        """Create a card/question or update an exact-name existing card."""
+        """Create or update a card/question, optionally with card-level filter parameters."""
         return await with_client(
             lambda client: tools.create_or_update_card(
                 client,
@@ -229,6 +233,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
                 collection_id=collection_id,
                 visualization_settings=visualization_settings,
                 description=description,
+                parameters=parameters,
                 dry_run=dry_run,
                 confirm=confirm,
             ),
@@ -246,7 +251,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         dry_run: bool = False,
         confirm: bool = False,
     ) -> dict[str, Any]:
-        """Update a card/question by ID."""
+        """Update a card/question by ID, including card-level filter parameters."""
         return await with_client(
             lambda client: tools.update_card(
                 client,
@@ -344,7 +349,7 @@ def register_curated_tools(mcp: FastMCP, context: McpAppContext) -> None:
         dry_run: bool = False,
         confirm: bool = False,
     ) -> dict[str, Any]:
-        """Update dashboard metadata, parameters, or settings by ID."""
+        """Update dashboard metadata, tabs, parameters, or settings by ID."""
         return await with_client(
             lambda client: tools.update_dashboard(
                 client,

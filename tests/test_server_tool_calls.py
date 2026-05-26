@@ -12,6 +12,30 @@ async def call_tool(name: str, arguments: dict[str, object]) -> dict[str, object
 
 
 @pytest.mark.asyncio
+async def test_card_parameters_and_dashboard_tabs_are_exposed_by_mcp_tools() -> None:
+    card = await call_tool(
+        "metabase_create_card",
+        {
+            "name": "Filtered Card",
+            "dataset_query": {"database": 1},
+            "parameters": [{"id": "status", "type": "category"}],
+            "dry_run": True,
+        },
+    )
+    dashboard = await call_tool(
+        "metabase_update_dashboard",
+        {
+            "dashboard_id": 3,
+            "updates": {"tabs": [{"id": -1, "name": "Overview"}]},
+            "dry_run": True,
+        },
+    )
+
+    assert card["request"]["body"]["parameters"] == [{"id": "status", "type": "category"}]
+    assert dashboard["request"]["body"]["tabs"] == [{"id": -1, "name": "Overview"}]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "expected_path"),
     [

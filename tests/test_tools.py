@@ -17,6 +17,7 @@ from mcp_for_metabase.tools import (
     copy_document,
     create_api_key,
     create_bookmark,
+    create_card,
     create_card_public_link,
     create_dashboard,
     create_dashboard_public_link,
@@ -74,6 +75,7 @@ from mcp_for_metabase.tools import (
     restore_snapshot,
     revert_revision,
     run_card_query,
+    run_query,
     snapshot_entity,
     sync_database_schema,
     update_api_key,
@@ -81,6 +83,7 @@ from mcp_for_metabase.tools import (
     update_cache_config,
     update_card,
     update_collection,
+    update_dashboard,
     update_dashboard_cards,
     update_dashboard_parameters,
     update_document,
@@ -104,6 +107,67 @@ def make_client(handler: httpx.MockTransport) -> MetabaseClient:
         ),
         transport=handler,
     )
+
+
+@pytest.mark.asyncio
+async def test_run_query_builds_native_dataset_body() -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    try:
+        response = await run_query(
+            client,
+            database_id=3,
+            query_type="native",
+            query={"query": "select 1 as value", "template-tags": {}},
+            dry_run=True,
+        )
+    finally:
+        await client.aclose()
+
+    assert response["request"]["body"] == {
+        "database": 3,
+        "type": "native",
+        "native": {"query": "select 1 as value", "template-tags": {}},
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_query_still_blocks_unsafe_native_sql() -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    try:
+        with pytest.raises(SafetyError):
+            await run_query(
+                client,
+                database_id=3,
+                query_type="native",
+                query={"query": "select 1; drop table orders"},
+                dry_run=True,
+            )
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_card_parameters_and_dashboard_tabs_are_forwarded() -> None:
+    client = make_client(httpx.MockTransport(lambda _request: httpx.Response(200, json={})))
+    try:
+        card = await create_card(
+            client,
+            name="Filtered Card",
+            dataset_query={"database": 3, "type": "query", "query": {}},
+            parameters=[{"id": "status", "type": "category"}],
+            dry_run=True,
+        )
+        dashboard = await update_dashboard(
+            client,
+            dashboard_id=3,
+            updates={"tabs": [{"id": -1, "name": "Overview"}]},
+            dry_run=True,
+        )
+    finally:
+        await client.aclose()
+
+    assert card["request"]["body"]["parameters"] == [{"id": "status", "type": "category"}]
+    assert dashboard["request"]["body"]["tabs"] == [{"id": -1, "name": "Overview"}]
 
 
 @pytest.mark.asyncio
@@ -349,6 +413,7 @@ async def test_create_or_update_helpers_update_exact_matches() -> None:
             client,
             name="Card",
             dataset_query={"database": 1, "type": "query", "query": {}},
+            parameters=[{"id": "status", "type": "category"}],
             dry_run=True,
         )
     finally:
@@ -358,6 +423,7 @@ async def test_create_or_update_helpers_update_exact_matches() -> None:
     assert dashboard["request"]["body"]["description"] == "Updated"
     assert card["request"]["path"] == "/api/card/2"
     assert card["request"]["body"]["name"] == "Card"
+    assert card["request"]["body"]["parameters"] == [{"id": "status", "type": "category"}]
 
 
 @pytest.mark.asyncio
