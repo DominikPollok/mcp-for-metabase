@@ -6,6 +6,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Nothing yet.
+
+## [0.4.0] - 2026-05-26
+
 ### Changed
 
 - CI and the PyPI release workflow now verify synchronized package metadata, matching release
