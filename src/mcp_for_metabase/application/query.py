@@ -55,7 +55,8 @@ async def run_query(
     query_type: str = "query",
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    body = {"database": database_id, "type": query_type, "query": query}
+    query_key = "native" if query_type == "native" else "query"
+    body = {"database": database_id, "type": query_type, query_key: query}
     return await client.request(
         "POST",
         "/api/dataset",
